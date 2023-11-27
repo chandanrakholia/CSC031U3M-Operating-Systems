@@ -20,7 +20,22 @@
  *  Adaptive scheduling granularity, math enhancements by Peter Zijlstra
  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
  */
+/*chandan
+High level overview of completely fair scheduler in linux kernel which is introduced from 
+kernel version 2.6.23
 
+The whole concept of cfs is based on virtual runtime of process, heap which will give
+minimum key in O(1) time,we are using heap and putting virtual runtime of each process in the
+heap, we are taking out process with minimum virtual runtime, and process it.
+
+Virtual Runtime: At high level, vruntime depends on executed time and ideal execution time.
+we are supposed to provide completely fair cpu time to each processes. for n process we are suppossed
+to provide (100/n)% of cpu time.
+
+suppose p1 process has lower vruntime, then pop p1, suppose it has executed 23 ms earlier and 
+now it ran for 20 ms then it vruntime increases;
+vruntime is always increases for process, it monotonic in nature;
+chandan*/
 #include <linux/energy_model.h>
 #include <linux/mmap_lock.h>
 #include <linux/hugetlb_inline.h>
