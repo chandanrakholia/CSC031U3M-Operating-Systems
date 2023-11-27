@@ -33,8 +33,14 @@ we are supposed to provide completely fair cpu time to each processes. for n pro
 to provide (100/n)% of cpu time.
 
 suppose p1 process has lower vruntime, then pop p1, suppose it has executed 23 ms earlier and 
-now it ran for 20 ms then it vruntime increases;
-vruntime is always increases for process, it monotonic in nature;
+now it ran for 20 ms then it vruntime changes, it will increases, then push again in our heap
+vruntime is always increases for process, it monotonic in nature, now again pop from heap and so on...;
+chandan*/
+/*chandan
+CFS implements three scheduling policies/ different classes of cfs.
+1. SCHED_NORMAL(OTHER): normal processes eg. shell script
+2. SCHED_BATCH : it meant for proceess which are competition bound, not interrupt them too much.
+3. SCHED_IDLE : background processes, if no user uses particular processes then use idle class.
 chandan*/
 #include <linux/energy_model.h>
 #include <linux/mmap_lock.h>
