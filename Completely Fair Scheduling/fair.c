@@ -24,6 +24,9 @@
 High level overview of completely fair scheduler in linux kernel which is introduced from 
 kernel version 2.6.23
 
+Favouring I/O bound processes over processor bound processes.
+
+In whole file i am frequently alternating using word heap or rbtree(red black tree), Consider both as same.
 The whole concept of cfs is based on virtual runtime of process, heap which will give
 minimum key in O(1) time,we are using heap and putting virtual runtime of each process in the
 heap, we are taking out process with minimum virtual runtime, and process it.
@@ -35,13 +38,14 @@ to provide (100/n)% of cpu time.
 suppose p1 process has lower vruntime, then pop p1, suppose it has executed 23 ms earlier and 
 now it ran for 20 ms then it vruntime changes, it will increases, then push again in our heap
 vruntime is always increases for process, it monotonic in nature, now again pop from heap and so on...;
-chandan*/
+*/
+
 /*chandan
 CFS implements three scheduling policies/ different classes of cfs.
 1. SCHED_NORMAL(OTHER): normal processes eg. shell script
 2. SCHED_BATCH : it meant for proceess which are competition bound, not interrupt them too much.
 3. SCHED_IDLE : background processes, if no user uses particular processes then use idle class.
-chandan*/
+*/
 #include <linux/energy_model.h>
 #include <linux/mmap_lock.h>
 #include <linux/hugetlb_inline.h>
@@ -272,7 +276,10 @@ static void __update_inv_weight(struct load_weight *lw)
 	else
 		lw->inv_weight = WMULT_CONST / w;
 }
-
+/*chandan
+for high priority process weight will be high
+for low priority process weight will be low.
+*/
 /*
  * delta_exec * weight / lw.weight
  *   OR
@@ -835,6 +842,9 @@ RB_DECLARE_CALLBACKS(static, min_deadline_cb, struct sched_entity,
 /*
  * Enqueue an entity into the rb-tree:
  */
+/*chandan
+ adds a process runnable (wakes up) or is first created via fork()
+*/
 static void __enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
 	avg_vruntime_add(cfs_rq, se);
@@ -842,7 +852,13 @@ static void __enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	rb_add_augmented_cached(&se->run_node, &cfs_rq->tasks_timeline,
 				__entity_less, &min_deadline_cb);
 }
+/*chandan
+__dequeue_entitiy()
+when a process blocks(become unrunnable) or terminates (ceases to exist)
 
+This function is also calling rb_erase
+rb_erase(): updates rb_leftmost and invoking rb_next();
+*/
 static void __dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
 	rb_erase_augmented_cached(&se->run_node, &cfs_rq->tasks_timeline,
@@ -1154,6 +1170,13 @@ static void update_tg_load_avg(struct cfs_rq *cfs_rq)
 /*
  * Update the current task's runtime statistics.
  */
+/*chandan
+update_curr()is invoked periodically by the system timer and also whenever a process
+becomes runnable or blocks(unrunnable)
+
+this is the function to update virtual runtime of current picked process by os,
+so that next time we pick then it's accurate.
+*/
 static void update_curr(struct cfs_rq *cfs_rq)
 {
 	struct sched_entity *curr = cfs_rq->curr;
@@ -1162,8 +1185,10 @@ static void update_curr(struct cfs_rq *cfs_rq)
 
 	if (unlikely(!curr))
 		return;
-
 	delta_exec = now - curr->exec_start;
+/*chandan
+delta_exec is difference of curr time and process started tiem.
+chandan*/
 	if (unlikely((s64)delta_exec <= 0))
 		return;
 
@@ -1181,6 +1206,10 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	schedstat_add(cfs_rq->exec_clock, delta_exec);
 
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
+	/*chandan
+	updating vruntime of current picked process in a such way that it takes into account of
+	 all other process also. 
+	*/
 	update_deadline(cfs_rq, curr);
 	update_min_vruntime(cfs_rq);
 
@@ -5429,6 +5458,11 @@ set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
  * 4) do not run the "skip" process, if something else is available
  */
 static struct sched_entity *
+/*chandan
+selects the process with the smallest vruntime i.e leftmost node
+pick_next_entity() does not actually tranverse the tree to find the left-most
+node, because, the value is cached by rb_leftmost;
+*/
 pick_next_entity(struct cfs_rq *cfs_rq)
 {
 	/*
